@@ -6,8 +6,8 @@
 #include <stdbool.h>
 #include <time.h>
 
-static long arraySize = 100000000;
-static long primeArraySize = 100000000;
+static long arraySize ;
+static long primeArraySize ;
 
 int eratostn(int maxNum , int prime[]){
 	if (maxNum < 10){
@@ -62,12 +62,21 @@ int eratostn(int maxNum , int prime[]){
 
 int main()
 {
-	clock_t firstSeconds ,secondSeconds;
-   	firstSeconds =  clock();
-	int *prime = new int[primeArraySize];
-	int primeSize = eratostn(arraySize , prime);
-	secondSeconds =  clock();
-	printf("%d prime num founded from 1 to %d in %f seconds\n", primeSize , arraySize , ((float)secondSeconds - (float)firstSeconds)/1000.0);
+	arraySize = 10000000;
+	primeArraySize = 10000000;
+	for (int j = 0; j < 2; ++j)
+	{
+		printf("size : 10^%d\n",(int)log10(arraySize));
+		clock_t firstSeconds ,secondSeconds;
+	   	firstSeconds =  clock();
+		int *prime = new int[primeArraySize];
+		int primeSize = eratostn(arraySize , prime);
+		secondSeconds =  clock();
+		printf("%d in %f seconds %d MB\n", (int)primeSize , 
+			((float)secondSeconds - (float)firstSeconds)/1000.0 , (int)(sizeof(*prime)*arraySize*2/1000000));
+		arraySize *= 10;
+		primeArraySize *= 10;
+	}
 	// for (int i = 0; i < primeSize; ++i)
 	// {
 	// 	printf("%d ", prime[i]);

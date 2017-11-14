@@ -2,13 +2,12 @@
 //created by ahbeheshti
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
-#include <windows.h>
+#include <pthread.h>
 #include <time.h>
 
-DWORD WINAPI MyThreadFunction( LPVOID lpParam );
-
-#define BUF_SIZE 255
+using namespace std;
 
 long arraySize ;
 long primeArraySize ;
@@ -35,33 +34,22 @@ void work(int *prime, int prePrimeNum,int maxNum , bool *temp , int size , int t
 	}
 }
 
-DWORD WINAPI threadFunction( LPVOID lpParam ) 
+void *threadFunction( void* lpParam ) 
 { 
-    HANDLE hStdout;
     PDATA pDataArray;
-
-    TCHAR msgBuf[BUF_SIZE];
-    size_t cchStringSize;
-    DWORD dwChars;
-    hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
-    if( hStdout == INVALID_HANDLE_VALUE )
-        return 1;
     pDataArray = (PDATA)lpParam;
     work(pDataArray->prime , pDataArray->prePrimeNum, pDataArray->maxNum , pDataArray->temp , pDataArray->size ,
     	pDataArray->threadCreated , pDataArray->threadId);
-
     return 0; 
 } 
 
 void distributeAndWork(int *prime,int prePrimeNum,int maxNum , bool *temp , int size){
-	
+	pthread_t hThreadArray[threadNum];
 	PDATA pDataArray[threadNum];
-    DWORD   dwThreadIdArray[threadNum];
-    HANDLE  hThreadArray[threadNum]; 
 
     for( int i=0; i<threadNum; i++ )
     {
-        pDataArray[i] = (PDATA) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(MYDATA));
+    	pDataArray[i]=(MYDATA *)malloc(sizeof(MYDATA));
         pDataArray[i]->prime = prime;
         pDataArray[i]->prePrimeNum = prePrimeNum;
         pDataArray[i]->maxNum = maxNum;
@@ -69,29 +57,20 @@ void distributeAndWork(int *prime,int prePrimeNum,int maxNum , bool *temp , int 
         pDataArray[i]->size = size;
         pDataArray[i]->threadCreated = threadNum;
         pDataArray[i]->threadId = i;
-        hThreadArray[i] = CreateThread( 
-            NULL,                   // default security attributes
-            0,                      // use default stack size  
-            threadFunction,       	// thread function name
-            pDataArray[i],          // argument to thread function 
-            0,                      // use default creation flags 
-            &dwThreadIdArray[i]);   // returns the thread identifier 
-
-        if (hThreadArray[i] == NULL) 
-        	ExitProcess(3);
-    }
-
-    WaitForMultipleObjects(threadNum, hThreadArray, TRUE, INFINITE);
-
-    for(int i=0; i<threadNum; i++)
-    {
-        CloseHandle(hThreadArray[i]);
-        if(pDataArray[i] != NULL)
-        {
-            HeapFree(GetProcessHeap(), 0, pDataArray[i]);
-            pDataArray[i] = NULL;    // Ensure address is not reused.
+        if(pthread_create(&hThreadArray[i], NULL, threadFunction, (void *)pDataArray[i])) {
+        	printf("problem happened\n");
+			return ;
         }
     }
+
+    for( int i=0; i<threadNum; i++ ){
+	    if(pthread_join(hThreadArray[i], NULL)) {
+	    	printf("problem happened\n");
+	    	free(pDataArray[i]);
+			return ;
+		}
+	}
+
 }
 
 int eratostn(int maxNum , int *prime){
@@ -157,9 +136,8 @@ int main()
 			int *prime = new int[primeArraySize];
 			int primeSize = eratostn(arraySize , prime);
 			secondSeconds =  clock();
-			printf("%d in %f seconds %d MB %d thread\n", (int)primeSize , 
-			((float)secondSeconds - (float)firstSeconds)/1000.0 , (int)(sizeof(*prime)*arraySize*2/1000000)
-			,threadNum);
+			printf("%d in %f seconds %d MB\n", (int)primeSize , 
+			((float)secondSeconds - (float)firstSeconds)/1000000.0 , (int)(sizeof(*prime)*arraySize*2/1000000));
 
 			/////////////////////////////////////////////////////
 			threadNum++;
@@ -167,6 +145,7 @@ int main()
 		arraySize *= 10;
 		primeArraySize *= 10;
 	}
+	
 	// for (int i = 0; i < primeSize; ++i)
 	// {
 	// 	printf("%d ", prime[i]);

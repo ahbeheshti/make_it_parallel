@@ -6,13 +6,11 @@
 #include <windows.h>
 #include <time.h>
 
-DWORD WINAPI MyThreadFunction( LPVOID lpParam );
-
 #define BUF_SIZE 255
 
 long arraySize ;
 long primeArraySize ;
-int threadNum ;
+int processNum ;
 
 typedef struct MyData {
     int *prime;
@@ -35,62 +33,42 @@ void work(int *prime, int prePrimeNum,int maxNum , bool *temp , int size , int t
 	}
 }
 
-DWORD WINAPI threadFunction( LPVOID lpParam ) 
+LPCSTR processFunction( PDATA pDataArray ) 
 { 
-    HANDLE hStdout;
-    PDATA pDataArray;
-
-    TCHAR msgBuf[BUF_SIZE];
-    size_t cchStringSize;
-    DWORD dwChars;
-    hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
-    if( hStdout == INVALID_HANDLE_VALUE )
-        return 1;
-    pDataArray = (PDATA)lpParam;
     work(pDataArray->prime , pDataArray->prePrimeNum, pDataArray->maxNum , pDataArray->temp , pDataArray->size ,
     	pDataArray->threadCreated , pDataArray->threadId);
-
-    return 0; 
+    return 0;
 } 
 
 void distributeAndWork(int *prime,int prePrimeNum,int maxNum , bool *temp , int size){
 	
-	PDATA pDataArray[threadNum];
-    DWORD   dwThreadIdArray[threadNum];
-    HANDLE  hThreadArray[threadNum]; 
+	PDATA pDataArray[processNum];
+    STARTUPINFO sProcessArray[processNum];
+    PROCESS_INFORMATION pProcessArray[processNum];
 
-    for( int i=0; i<threadNum; i++ )
+    for( int i=0; i<processNum; i++ )
     {
-        pDataArray[i] = (PDATA) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(MYDATA));
+        pDataArray[i]=(MYDATA *)malloc(sizeof(MYDATA));
         pDataArray[i]->prime = prime;
         pDataArray[i]->prePrimeNum = prePrimeNum;
         pDataArray[i]->maxNum = maxNum;
         pDataArray[i]->temp = temp;
         pDataArray[i]->size = size;
-        pDataArray[i]->threadCreated = threadNum;
+        pDataArray[i]->threadCreated = processNum;
         pDataArray[i]->threadId = i;
-        hThreadArray[i] = CreateThread( 
-            NULL,                   // default security attributes
-            0,                      // use default stack size  
-            threadFunction,       	// thread function name
-            pDataArray[i],          // argument to thread function 
-            0,                      // use default creation flags 
-            &dwThreadIdArray[i]);   // returns the thread identifier 
 
-        if (hThreadArray[i] == NULL) 
-        	ExitProcess(3);
+        ZeroMemory( &sProcessArray[i], sizeof(sProcessArray[i]) );
+	    sProcessArray[i].cb = sizeof(sProcessArray[i]);
+	    ZeroMemory( &pProcessArray, sizeof(pProcessArray) );
+
+        CreateProcess(
+        	processFunction(pDataArray[i]),
+        	NULL, NULL, NULL, FALSE, 0, NULL, NULL, &sProcessArray[i], &pProcessArray[i]);
     }
 
-    WaitForMultipleObjects(threadNum, hThreadArray, TRUE, INFINITE);
-
-    for(int i=0; i<threadNum; i++)
-    {
-        CloseHandle(hThreadArray[i]);
-        if(pDataArray[i] != NULL)
-        {
-            HeapFree(GetProcessHeap(), 0, pDataArray[i]);
-            pDataArray[i] = NULL;    // Ensure address is not reused.
-        }
+    for (int i = 0; i < processNum; ++i) {
+        WaitForSingleObject(pProcessArray[i].hProcess, INFINITE);
+        free(pDataArray[i]);
     }
 }
 
@@ -143,11 +121,11 @@ int main()
 {
 	arraySize = 10000000;
 	primeArraySize = 10000000;
-	threadNum = 1;
+	processNum = 1;
 	for (int j = 0; j < 2; ++j)
 	{
 		printf("size : 10^%d\n",(int)log10(arraySize));
-		threadNum = 1;
+		processNum =1 ;
 		for (int i = 0; i < 2; ++i)
 		{
 			/////////////////////////////////////////////////////
@@ -157,12 +135,12 @@ int main()
 			int *prime = new int[primeArraySize];
 			int primeSize = eratostn(arraySize , prime);
 			secondSeconds =  clock();
-			printf("%d in %f seconds %d MB %d thread\n", (int)primeSize , 
+			printf("%d in %f seconds %d MB %d process\n", (int)primeSize , 
 			((float)secondSeconds - (float)firstSeconds)/1000.0 , (int)(sizeof(*prime)*arraySize*2/1000000)
-			,threadNum);
+			,processNum);
 
 			/////////////////////////////////////////////////////
-			threadNum++;
+			processNum++;
 		}
 		arraySize *= 10;
 		primeArraySize *= 10;
